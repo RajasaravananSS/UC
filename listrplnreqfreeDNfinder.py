@@ -53,7 +53,8 @@ print(output_dict)
 freetpn = []
 listofdesc = []
 tpndump = output_dict['soapenv:Envelope']['soapenv:Body']['ns:listRoutePlanResponse']['return']['routePlan']
-#You can ignore this if you don't want to test output receivedtdsdump = output_dict['soapenv:Envelope']['soapenv:Body']['ns:listRoutePlanResponse']['return']
+#You can ignore this if you don't want to test output received
+tdsdump = output_dict['soapenv:Envelope']['soapenv:Body']['ns:listRoutePlanResponse']['return']
 print(tpndump)
 #You can ignore this if you don't want to test output received
 print(tdsdump)
