@@ -1,0 +1,668 @@
+import zeep
+import requests
+import urllib3
+from urllib3 import exceptions
+from zeep import client
+from zeep.plugins import Plugin
+from zeep.client import Client
+from zeep.transports import Transport
+from zeep.settings import Settings
+from zeep.exceptions import Fault
+from requests import Session
+from requests.auth import HTTPBasicAuth
+from lxml import etree as ET
+from zeep import helpers
+import json
+import time
+import os
+import sys
+import pandas as pd
+
+
+userdev = "Test"
+
+
+
+
+with open("Path/cmcred.txt","r") as f:
+	mylist = f.read().splitlines() 
+	USERNAME=mylist[0]
+	PASSWORD=mylist[1]
+	ccmip=mylist[2]
+	f.close()
+
+
+DEBUG = False
+
+WSDL_FILE = 'Path/axlsqltoolkit/schema/12.5/AXLAPI.wsdl'
+
+# The first step is to create a SOAP client session
+session = requests.Session()
+
+# We avoid certificate verification by default
+# And disable insecure request warnings to keep the output clear
+session.verify = False
+urllib3.disable_warnings( exceptions.InsecureRequestWarning )
+
+# Add Basic Auth credentials
+session.auth = HTTPBasicAuth( USERNAME,PASSWORD )
+
+# Create a Zeep transport and set a reasonable timeout value
+transport = Transport( session = session, timeout = 10 )
+
+# strict=False is not always necessary, but it allows zeep to parse imperfect XML
+settings = Settings( strict = False, xml_huge_tree = True )
+
+client = zeep.Client( WSDL_FILE, settings = settings, transport = transport )
+
+service = client.create_service( '{http://www.cisco.com/AXLAPIService/}AXLAPIBinding',f'https://{ccmip}:8443/axl/' )
+
+dptags = {'name':'',
+	'product':'',
+	'model':'',
+	'lines':{'line':[{'dirn':{'pattern':'','routePartitionName':''}}]},
+	}
+
+
+#Get the User Details
+#print(mydata)
+#for mydatauser in mydata:
+#	myusers = mydatauser.split(',')
+
+devtags = {'pattern':'',
+	'description':'',
+	'usage':'',
+	'associatedDevices':{'device':[]},
+	}
+phtags = {'name':'',
+'product':'',
+'model':'',
+'ownerUserName':''}
+#list the Jabber
+def csfdevice():
+	with open("Path/Jabberdatacsf.csv","a") as f:
+			#f.write(device)
+			#f.write("\t")
+			f.write(str("devicename") + '\t' + str("devmodel") + '\t' + str("devown") + '\t' + str("devloc") + '\t' + str("devpool") + '\t' + str("Directory") +'\t' + str("Directory1") + '\t' + str("Directory2") + '\t' + str("Directory3") + '\n')
+			f.close()
+	try:
+		myresp = service.listPhone({'name': 'CSF%'}, returnedTags = {'name':''})
+		#print(myresp)
+		input_dict = helpers.serialize_object(myresp)
+		mydevname = input_dict['return']['phone']
+		for dev in mydevname:
+			devname = dev['name']
+			device = str(devname)
+			try:
+				myresp = service.getPhone(name = device, returnedTags = {'name':'','model':'','devicePoolName':'','locationName':'','ownerUserName':'','lines':{'line':[{'dirn':{'pattern':''}}]}})
+				input_dict = helpers.serialize_object(myresp)
+				output_dict = json.loads(json.dumps(input_dict))
+				mydevname = output_dict['return']['phone']['name']
+				mydevmodel = output_dict['return']['phone']['model']
+				mypool = output_dict['return']['phone']['devicePoolName']['_value_1']
+				myloc = output_dict['return']['phone']['locationName']['_value_1']
+				mydevown = output_dict['return']['phone']['ownerUserName']['_value_1']
+				with open("Path/Jabberdatacsf.csv","a") as f:
+					#f.write(device)
+					#f.write("\t")
+					f.write(str(mydevname) + '\t' + str(mydevmodel) + '\t' + str(mydevown) + '\t' + str(myloc) + '\t' + str(mypool) + '\t')
+					f.close()
+				try:
+					
+					myline = output_dict['return']['phone']['lines']['line']
+					#print(myresp)
+					#print(myline)
+					lline = []
+					for line in myline:
+						#print(line)
+						
+						dline = line['dirn']['pattern']
+						lline.append(dline)
+					gllen = len(lline)
+					#print(gllen,lline)
+					if (gllen == 1):
+						with open("Path/Jabberdatacsf.csv","a") as f:
+							f.write(str(dline))
+							f.write('\n')
+							f.close()
+					else:
+
+						for i in range(gllen):
+							if ( i < (gllen - 1)):
+								with open("Path/Jabberdatacsf.csv","a") as f:
+									f.write(str(lline[i]))
+									f.write('\t')
+									f.close()
+							else:
+								with open("Path/Jabberdatacsf.csv","a") as f:
+									f.write(str(lline[i]))
+									f.write('\n')
+									f.close()
+					lline.clear()
+							
+				except:
+					#print( f'Zeep error: Get Line: { err }' )
+					with open("Path/Jabberdatacsf.csv","a") as f:
+						#f.write(device)
+						#f.write("\t")
+						f.write("No Line")
+						f.write("\n")
+					continue
+						
+							
+
+			except Fault as err:
+				print( f'Zeep error: Get Jabber: { err }' )
+				with open("Path/Jabberdatacsf.csv","a") as f:
+					f.write(device)
+					f.write("\t")
+					f.write("No Data")
+					f.write("\n")
+				continue
+	except Fault as err:
+			print( f'Zeep error: List Jabber: { err }' )
+
+def j4wdevice():
+	try:
+		
+		myresp = service.listPhone({'name': 'J4W%'}, returnedTags = {'name':''})
+		#print(myresp)
+		input_dict = helpers.serialize_object(myresp)
+		mydevname = input_dict['return']['phone']
+		for dev in mydevname:
+			devname = dev['name']
+			device = str(devname)
+			try:
+				myresp = service.getPhone(name = device, returnedTags = {'name':'','model':'','devicePoolName':'','locationName':'','ownerUserName':'','lines':{'line':[{'dirn':{'pattern':''}}]}})
+				input_dict = helpers.serialize_object(myresp)
+				output_dict = json.loads(json.dumps(input_dict))
+				mydevname = output_dict['return']['phone']['name']
+				mydevmodel = output_dict['return']['phone']['model']
+				mypool = output_dict['return']['phone']['devicePoolName']['_value_1']
+				myloc = output_dict['return']['phone']['locationName']['_value_1']
+				mydevown = output_dict['return']['phone']['ownerUserName']['_value_1']
+				with open("Path/Jabberdatacsf.csv","a") as f:
+					#f.write(device)
+					#f.write("\t")
+					f.write(str(mydevname) + '\t' + str(mydevmodel) + '\t' + str(mydevown) + '\t' + str(myloc) + '\t' + str(mypool) + '\t')
+					f.close()
+				try:
+					
+					cmyline = output_dict['return']['phone']['lines']['line']
+					#print(myresp)
+					#print(myline)
+					clline = []
+					for cline in cmyline:
+						#print(line)
+						
+						cdline = cline['dirn']['pattern']
+						clline.append(cdline)
+					cgllen = len(clline)
+					
+					if (cgllen == 1):
+						with open("Path/Jabberdatacsf.csv","a") as f:
+							f.write(str(cdline))
+							f.write('\n')
+							f.close()
+					else:
+
+						for i in range(cgllen):
+							if ( i < (cgllen - 1)):
+								with open("Path/Jabberdatacsf.csv","a") as f:
+									f.write(str(clline[i]))
+									f.write('\t')
+									f.close()
+							else:
+								with open("Path/Jabberdatacsf.csv","a") as f:
+									f.write(str(clline[i]))
+									f.write('\n')
+									f.close()
+					clline.clear()
+							
+				except:
+					#print( f'Zeep error: Get Line: { err }' )
+					with open("Path/Jabberdatacsf.csv","a") as f:
+						#f.write(device)
+						#f.write("\t")
+						f.write("No Line")
+						f.write("\n")
+					continue
+						
+							
+
+			except Fault as err:
+				#print( f'Zeep error: Get Jabber: { err }' )
+				with open("Path/Jabberdatacsf.csv","a") as f:
+					f.write(device)
+					f.write("\t")
+					f.write("No Data")
+					f.write("\n")
+				continue
+	except Fault as err:
+			print( f'Zeep error: List Jabber: { err }' )
+
+
+def sepdevice():
+	try:
+		
+		myresp = service.listPhone({'name': 'J4W%'}, returnedTags = {'name':''})
+		#print(myresp)
+		input_dict = helpers.serialize_object(myresp)
+		mydevname = input_dict['return']['phone']
+		for dev in mydevname:
+			devname = dev['name']
+			device = str(devname)
+			try:
+				myresp = service.getPhone(name = device, returnedTags = {'name':'','model':'','devicePoolName':'','locationName':'','ownerUserName':'','lines':{'line':[{'dirn':{'pattern':''}}]}})
+				input_dict = helpers.serialize_object(myresp)
+				output_dict = json.loads(json.dumps(input_dict))
+				mydevname = output_dict['return']['phone']['name']
+				mydevmodel = output_dict['return']['phone']['model']
+				mypool = output_dict['return']['phone']['devicePoolName']['_value_1']
+				myloc = output_dict['return']['phone']['locationName']['_value_1']
+				mydevown = output_dict['return']['phone']['ownerUserName']['_value_1']
+				with open("Path/Jabberdatacsf.csv","a") as f:
+					#f.write(device)
+					#f.write("\t")
+					f.write(str(mydevname) + '\t' + str(mydevmodel) + '\t' + str(mydevown) + '\t' + str(myloc) + '\t' + str(mypool) + '\t')
+					f.close()
+				try:
+					
+					cmyline = output_dict['return']['phone']['lines']['line']
+					#print(myresp)
+					#print(myline)
+					clline = []
+					for cline in cmyline:
+						#print(line)
+						
+						cdline = cline['dirn']['pattern']
+						clline.append(cdline)
+					cgllen = len(clline)
+					
+					if (cgllen == 1):
+						with open("Path/Jabberdatacsf.csv","a") as f:
+							f.write(str(cdline))
+							f.write('\n')
+							f.close()
+					else:
+
+						for i in range(cgllen):
+							if ( i < (cgllen - 1)):
+								with open("Path/Jabberdatacsf.csv","a") as f:
+									f.write(str(clline[i]))
+									f.write('\t')
+									f.close()
+							else:
+								with open("Path/Jabberdatacsf.csv","a") as f:
+									f.write(str(clline[i]))
+									f.write('\n')
+									f.close()
+					clline.clear()
+							
+				except:
+					#print( f'Zeep error: Get Line: { err }' )
+					with open("Path/Jabberdatacsf.csv","a") as f:
+						#f.write(device)
+						#f.write("\t")
+						f.write("No Line")
+						f.write("\n")
+					continue
+						
+							
+
+			except Fault as err:
+				#print( f'Zeep error: Get Jabber: { err }' )
+				with open("Path/Jabberdatacsf.csv","a") as f:
+					f.write(device)
+					f.write("\t")
+					f.write("No Data")
+					f.write("\n")
+				continue
+	except Fault as err:
+			print( f'Zeep error: List Jabber: { err }' )
+
+
+def getdevstatus():
+	
+	DEBUG = os.getenv("DEBUG") == "True"
+
+# The WSDL is a local file in the root directory, see README
+#WSDL_FILE = 'PATH/schema/12.5/RISService70.wsdl'
+	WSDL_FILE = "https://CCMIP:8443/realtimeservice2/services/RISService70?wsdl"
+
+	USERNAME = ""
+	PASSWORD = ""
+
+# This class lets you view the incoming and outgoing HTTP headers and XML
+	class MyLoggingPlugin(Plugin):
+		def egress(self, envelope, http_headers, operation, binding_options):
+			if not DEBUG:
+				return
+
+			# Format the request body as pretty printed XML
+			xml = etree.tostring(envelope, pretty_print=True, encoding="unicode") # type: ignore
+
+			print(f"\nRequest\n-------\nHeaders:\n{http_headers}\n\nBody:\n{xml}")
+
+		def ingress(self, envelope, http_headers, operation):
+			if not DEBUG:
+				return
+
+			# Format the response body as pretty printed XML
+			xml = etree.tostring(envelope, pretty_print=True, encoding="unicode") # type: ignore
+
+			print(f"\nResponse\n-------\nHeaders:\n{http_headers}\n\nBody:\n{xml}")
+
+
+	# The first step is to create a SOAP client session
+	session = Session()
+
+	# We disable certificate verification by default
+	session.verify = False
+	# Suppress the console warning about the resulting insecure requests
+	urllib3.disable_warnings(exceptions.InsecureRequestWarning)
+
+	# To enabled SSL cert checking (recommended for production)
+	# place the CUCM Tomcat cert .pem file in the root of the project
+	# and uncomment the two lines below
+
+	# CERT = 'changeme.pem'
+	# session.verify = CERT
+
+	session.auth = HTTPBasicAuth(USERNAME,PASSWORD)
+
+	transport = Transport(session=session, timeout=10)
+
+	# strict=False is not always necessary, but it allows zeep to parse imperfect XML
+	settings = Settings(strict=False, xml_huge_tree=True) # type: ignore
+
+	plugin = [MyLoggingPlugin()] if DEBUG else []
+
+	client = Client(wsdl=WSDL_FILE, settings=settings, transport=transport, plugins=plugin)
+
+	# Create the Zeep service binding to the Perfmon SOAP service at the specified CUCM
+	service = client.create_service(
+		'{http://schemas.cisco.com/ast/soap}RisBinding',
+		f'https://CCMIP:8443/realtimeservice2/services/RISService70',
+	)
+
+	# Build and execute the request object
+
+	stateInfo = ""
+
+	criteria = {
+		"MaxReturnedDevices": "8000",
+		"DeviceClass": "Phone",
+		"Model": "503",
+		"Status": "Any",
+		"NodeName": "",
+		"SelectBy": "Name",
+		"Protocol": "Any",
+		"DownloadStatus": "Any",
+		"SelectItems": {"item": []},
+	}
+
+	# One or more specific devices can be retrieved by replacing * with
+	# the device name in multiple items
+	criteria["SelectItems"]["item"].append({"Item": "*"})
+
+	rname = ""
+	rdirn = ""
+	rstatus = ""
+	rdesc = ""
+	rts = ""
+	rmodel = ""
+
+	with open('Path/Jabberstatus.csv', 'a', encoding='utf-8') as rdata:
+		rdata.write(str("devicename") + '\t' + str("DN") + '\t' + str("IPAddress") + '\t' + str("Status") + '\t' + str("Description") + '\t' + str("type") + '\t' + str("LastActive") + '\n')
+		rdata.close()
+
+	# Execute the request
+	try:
+		resp = service.selectCmDevice(stateInfo, criteria)
+		#with open('Path/Jabberstatus.csv', 'a', encoding='utf-8') as rdata:
+		#    rdata.write(str(resp))
+	except Fault as err:
+		print(f"Zeep error: selectCmDevice: { err }")
+		sys.exit(1)
+
+	print("\nselectCmDevice response:\n")
+	#print(resp, "\n")
+
+	for node in resp["SelectCmDeviceResult"]["CmNodes"]["item"]:
+		#print("The first loop")
+		#print(node["ReturnCode"])
+		if node["ReturnCode"] != "Ok":
+			continue
+
+		print("Node: ", node["Name"])
+	#print()
+		#print("first")
+		print(
+			"{name:16}{ip:16}{dirn:11}{status:13}{desc:16}{ts:17}".format(
+				name="Name",
+				ip="IP Address",
+				dirn="DN",
+				status="Status",
+				desc="Description",
+				ts="Time",
+			)
+		)
+		#print("Second")
+		print(
+			"{name:16}{ip:16}{dirn:11}{status:13}{desc:16}{ts:17}".format(
+					name="-" * 15,
+					ip="-" * 15,
+					dirn="-" * 10,
+					status="-" * 12,
+					desc="-" * 15,
+					ts="-" * 16,
+				)
+		)
+
+		for device in node["CmDevices"]["item"]:
+			#print("The second loop")
+			ipaddresses = device["IPAddress"]
+			ipaddress = ipaddresses["item"][0]["IP"] if ipaddresses else ""
+			description = device["Description"] if device["Description"] != None else ""
+			devicename = device["Name"]
+			model = device["Model"]
+			timestamp = time.strftime("%Y/%m/%d %H:%M", time.localtime(device["TimeStamp"]))
+
+			if device["LinesStatus"] == None:
+				#print(
+				#"{name:16}{ip:16}{dirn:11}{status:13}{desc:16}{ts:17}".format(
+				#	name=devicename,
+				#	ip=ipaddress,
+				#	dirn=" ",
+				#	status=" ",
+				#	desc=description,
+				#	ts=timestamp,
+				#))
+
+				rname = str(devicename)
+				rip = str(ipaddress)
+				rdirn = "None"
+				rstatus = "None"
+				rdesc = str(description)
+				rts = str(timestamp)
+				rmodel = str(model)
+				rdata = open('Path/Jabberstatus.csv', 'a', encoding='utf-8')
+					#fnd.write('\n')
+				if (rname) != None:
+					rdata.write(rname)
+				else:
+					rdata.write("None")								
+				rdata.write('\t')
+				if (rdirn) != None:
+					rdata.write(rdirn)
+				else:
+					rdata.write("None")
+				rdata.write('\t')
+				if (rip) != None:
+					rdata.write(rip)
+				else:
+					rdata.write("None")
+				rdata.write('\t')
+			
+				if (rstatus) != None:
+					rdata.write(rstatus)
+				else:
+					rdata.write("None")
+				rdata.write('\t')
+				if (rdesc) != None:
+					rdata.write(rdesc)
+				else:
+					rdata.write("None")
+				rdata.write('\t')
+				if (rmodel) != None:
+					rdata.write(rmodel)
+				else:
+					rdata.write("None")
+				rdata.write('\t')
+				if (rts) != None:
+					rdata.write(rts)
+				else:
+					rdata.write("None")
+				rdata.write('\n')
+				
+				
+				
+
+				
+				
+			
+			else:
+				for x in range(0, len(device["LinesStatus"]["item"])):
+					#print("the third loop")
+					if x == 0:
+						#print(
+						#	"{name:16}{ip:16}{dirn:11}{status:13}{desc:16}{ts:17}".format(
+						#		name=devicename,
+						#		ip=ipaddress,
+						#		dirn=device["LinesStatus"]["item"][x]["DirectoryNumber"],
+						#		status=device["LinesStatus"]["item"][x]["Status"],
+						#		desc=description,
+						#		ts=timestamp,
+						#	)
+						#)
+						rname = str(devicename)
+						rip = str(ipaddress)
+						rdirn = str(device["LinesStatus"]["item"][x]["DirectoryNumber"])
+						rstatus = str(device["LinesStatus"]["item"][x]["Status"])
+						rdesc = str(description)
+						rts = str(timestamp)
+						rmodel = str(model)
+						rdata = open('Path/Jabberstatus.csv', 'a', encoding='utf-8')
+					#fnd.write('\n')
+						if (rname) != None:
+							rdata.write(rname)
+						else:
+							rdata.write("None")								
+						rdata.write('\t')
+						if (rdirn) != None:
+							rdata.write(rdirn)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rip) != None:
+							rdata.write(rip)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+					
+						if (rstatus) != None:
+							rdata.write(rstatus)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rdesc) != None:
+							rdata.write(rdesc)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rmodel) != None:
+							rdata.write(rmodel)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rts) != None:
+							rdata.write(rts)
+						else:
+							rdata.write("None")
+						rdata.write('\n')
+								
+					else:
+						#print("the fourth loop")
+						#print(
+						#	"{pad:32}{dirn:11}{status:13}".format(
+						#		pad=" ",
+						#		dirn=device["LinesStatus"]["item"][x]["DirectoryNumber"],
+						#		status=device["LinesStatus"]["item"][x]["Status"],
+						#	)
+						#)
+						rname = str(devicename)
+						rip = str(ipaddress)
+						rdirn = str(device["LinesStatus"]["item"][x]["DirectoryNumber"])
+						rstatus = str(device["LinesStatus"]["item"][x]["Status"])
+						rdesc = str(description)
+						rts = str(timestamp)
+						rmodel = str(model)
+						rdata = open('Path/Jabberstatus.csv', 'a', encoding='utf-8')
+					#fnd.write('\n')
+						if (rname) != None:
+							rdata.write(rname)
+						else:
+							rdata.write("None")								
+						rdata.write('\t')
+						if (rdirn) != None:
+							rdata.write(rdirn)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rip) != None:
+							rdata.write(rip)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+					
+						if (rstatus) != None:
+							rdata.write(rstatus)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rdesc) != None:
+							rdata.write(rdesc)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rmodel) != None:
+							rdata.write(rmodel)
+						else:
+							rdata.write("None")
+						rdata.write('\t')
+						if (rts) != None:
+							rdata.write(rts)
+						else:
+							rdata.write("None")
+						rdata.write('\n')
+
+def comparefiles():
+	data1 = pd.read_csv('Path/Jabberdatacsf.csv',header=0,delimiter='\t')
+	
+	print(data1)
+	data2 = pd.read_csv('Path/Jabberstatus.csv',header=0,delimiter='\t')
+	
+	print(data2)
+	data3 = pd.merge(data1,data2,on='devicename',how='left')
+	myfile = 'Path/Jabberstatus1.csv'
+	data3.to_csv(myfile, sep='\t', index=False, header=True)
+
+
+csfdevice()
+j4wdevice()
+sepdevice()
+getdevstatus()
+comparefiles()
+
+			
