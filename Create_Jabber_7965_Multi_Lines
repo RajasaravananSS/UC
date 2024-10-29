@@ -567,4 +567,7 @@ for users in data:
 	print('after clearing',devlines)
 
 
+#sample Bulk Input
+#UserID,Jabber,DeviceProfile,FirstName,LastName,emailID,DirectoryNumber,CSS,LineASCII
+
 
