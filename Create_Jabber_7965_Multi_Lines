@@ -1,0 +1,570 @@
+from zeep import Client
+import requests
+from requests.auth import HTTPBasicAuth
+from zeep import Client, Settings, Plugin, xsd
+from zeep.transports import Transport
+from zeep.exceptions import Fault
+import sys
+import urllib3
+import os
+from lxml import etree as ET
+from bs4 import BeautifulSoup as bs
+import re
+#from dotenv import load_dotenv
+#load_dotenv()
+
+#userdn = input("Please enter user extension:")
+#fname = input("Please enter first name:")
+#lname = input("Please enter last name:")
+#fullname = fname + lname
+#useremail = input("Please enter email:")
+
+with open("PATH/bulkload.txt","r") as inp:
+	data = inp.read().split('\n')
+
+bdirn = len(data)
+print(bdirn)
+
+#Func To Add End User
+
+def createenduser(enduserid, fname, lname, udevname, useremail):
+	print(useremail)
+	end_user = {
+		'firstName':fname,
+'displayName':enduserid,
+'lastName':lname,
+'userid':enduserid,
+'password':'123654',
+'pin':'123654',
+'mailid': useremail,
+'userLocale':'English United States',
+'associatedGroups': {
+		'userGroup': [
+			{
+				'name': 'Your Standard End Users',
+				'userRoles': {
+					'userRole': [
+						'Standard CCM End Users',
+						'Standard CCMUSER Administration'
+						'Standard CTI Enabled'
+					]
+				}
+			}
+		]
+	},
+'enableCti':'true',
+'presenceGroupName':'Standard Presence group',
+'enableMobility':'false',
+'enableMobileVoiceAccess':'false',
+'maxDeskPickupWaitTime':'10000',
+'remoteDestinationLimit':'4',
+'enableEmcc':'true',
+'homeCluster':'true',
+'imAndPresenceEnable':'true',
+'serviceProfile':'Your UC Profile',
+	}
+	
+	with client.settings(raw_response=True):
+		resulteu = (service.getUser( userid = enduserid ))
+
+	mytxteu = (resulteu.text)
+	phoneitereu = 0
+	e = 0
+	#print(mytxteu)
+	soup = bs(mytxteu, 'html.parser')
+	#print(soup.find_all('pattern'))
+	print(soup.find_all('userid'))
+	mydneu = (soup.find_all('userid'))
+	#Check for Existing user and associated devices
+	if (len(mydneu) == 0 ):
+		try:
+			respeu = service.addUser( end_user )
+			#print( '\naddUser response:\n' )
+		except Fault as err:
+			print( f'Zeep error: addUser: { err }' )
+			sys.exit( 1 )
+			print( respeu,'\n' )
+			print( '\naddUser response:\n' )
+	else:
+		print('User Already Exists')
+
+
+#FUNC to Update End User
+def updateenduser(enduserid,fname,lname,devices,myphoneProfiles,useremail,extn):
+	try:
+		resp = service.updateUser( 
+			userid= enduserid,
+			pin = '123654',
+			associatedDevices = devices,
+			phoneProfiles = myphoneProfiles,						 
+			selfService = extn,
+			enableUserToHostConferenceNow = True,
+			enableCti = True,
+			presenceGroupName = 'Standard Presence group',
+			enableMobility = False,
+			enableMobileVoiceAccess = False,
+			maxDeskPickupWaitTime = 10000,
+			remoteDestinationLimit = 4,
+			enableEmcc = True,
+			homeCluster = True,
+			imAndPresenceEnable = True,
+			serviceProfile = 'Your UC Profile',
+			primaryExtension = {'pattern' :extn,
+			'routePartitionName' :'Your_Phones_PRT'},
+			associatedGroups = {
+				'userGroup': [
+					{
+						'name': 'Your Standard End Users',
+						'userRoles': {
+							'userRole': [
+								'Standard CCM End Users',
+								'Standard CCMUSER Administration'
+								'Standard CTI Enabled'
+					]
+				}
+			}
+		]
+	}
+					
+		)
+
+	except Fault as err:
+		print( f'Zeep error: updateUser: { err }' )
+		sys.exit( 1 )
+
+	print( '\nupdateUser response:\n' )
+	print( resp,'\n' )
+
+
+#FUNC to Add DIrectory Number
+def adduserline(fullname, fname, lname, udevname, useremail, userdn, usercss):
+	print('The Current User Dn is',userdn)
+	print(fullname)
+	print(fname)
+	print(lname)
+	print(udevname)
+	print(useremail)
+	print(usercss)
+	line = {
+		'pattern':userdn,
+'description':fullname,
+'usage':'Device',
+'routePartitionName':'Your_Phones_PRT',
+'aarKeepCallHistory':'true',
+'aarVoiceMailEnabled':'false',
+'callForwardAll':{
+				'forwardToVoiceMail':'false',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+'callForwardBusy':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+'callForwardBusyInt':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+'callForwardNoAnswer':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+'callForwardNoAnswerInt':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+
+'callForwardNoCoverage':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+'callForwardNoCoverageInt':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+'callForwardOnFailure':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+'callForwardAlternateParty':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+
+'callForwardNotRegistered':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+				},
+
+'callForwardNotRegisteredInt':{
+				'forwardToVoiceMail':'true',
+				'callingSearchSpaceName':'Your_Internal_CSS'
+							   },
+#'callPickupGroupName':'xsd.SkipValue',
+'autoAnswer':'Auto Answer Off',
+'networkHoldMohAudioSourceId':'1',
+'userHoldMohAudioSourceId':'1',
+'callingIdPresentationWhenDiverted':'Default',
+'alertingName':fullname,
+'asciiAlertingName':fullname,
+'presenceGroupName':'Standard Presence group',
+'shareLineAppearanceCssName':usercss,
+'voiceMailProfileName':'Your_VM_Profile',
+'patternPrecedence':'Default',
+'releaseClause':'No Error',
+'allowCtiControlFlag':'true',
+'rejectAnonymousCall':'false',
+'patternUrgency':'false',
+'cfaCssPolicy':'Use System Default',
+'partyEntranceTone':'Default',
+'useEnterpriseAltNum':'false',
+'useE164AltNum':'false',
+'active':'true',
+	}
+	# Execute the addline request
+	with client.settings(raw_response=True):
+		result = (service.listLine({ 'pattern' : userdn}, returnedTags={'description': '','pattern':'','alertingName':''}))
+		mytxt = (result.text)
+		print(mytxt)
+		soup = bs(mytxt, 'html.parser')
+		print(soup.find_all('pattern') )
+		print('\n')
+		print(soup.find_all('line'))
+		print('\n')
+		mydn = (soup.find_all('pattern'))
+		print(mydn)
+		print('the current dn lenght is',len(mydn))
+		ename =str(soup.find_all('alertingname'))
+		#print('Printing org name \n')
+		#print(ename)
+		orgusrn = ename.replace('[<alertingname>','').replace('</alertingname>]','')
+		#print(orgusrn)
+	
+		if (len(mydn) == 0 ):
+			try:
+				print('trying to add line')
+				resp = service.addLine(line)
+				print('\naddline response \n')
+				print(resp,'\n')
+			except Fault as err:
+				print(f'Zeep error: addLine: { err }')
+				sys.exit(1)    
+		else:
+			try:
+				print('trying update line')
+				
+		
+			except Fault as err:
+				print( f'Zeep error: updateLine: { err }' )
+				sys.exit(1)
+
+#FUNC to add phone
+def adduserphone(enduserid, fullname, fname, lname, udevname, useremail, devcss):
+	print('the current user id on the phone', fullname)
+	phone = {
+		'name':udevname,
+'description':enduserid,
+'product':'Cisco Unified Client Services Framework',
+'class':'Phone',
+'protocol':'SIP',
+'protocolSide':'User',
+'callingSearchSpaceName':devcss,
+'devicePoolName':'Your_DP',
+'commonPhoneConfigName':'Standard Common Phone Profile',
+'locationName':'Your_Location',
+'mediaResourceListName':'Your_MRGL',
+'networkHoldMohAudioSourceId':'1',
+'userHoldMohAudioSourceId':'1',
+'useTrustedRelayPoint': 'Default',
+'builtInBridgeStatus': 'Default',
+'packetCaptureMode': 'None',
+'deviceMobilityMode': 'Default',
+'certificateOperation':'No Pending Operation',
+'phoneTemplateName':'Standard Client Services Framework',
+'enableExtensionMobility':'true',
+'ownerUserName':enduserid,
+'allowCtiControlFlag':'true',
+'presenceGroupName':'Standard Presence group',
+'unattendedPort':'false',
+'requireDtmfReception':'false',
+'rfc2833Disabled':'false',
+'dndStatus':'false',
+'isActive':'true',
+'isDualMode':'false',
+'AllowPresentationSharingUsingBfcp':'false',
+'requireOffPremiseLocation':'false',
+'allowiXApplicableMedia':'false',
+'useDevicePoolCgpnIngressDN':'true',
+'enableCallRoutingToRdWhenNoneIsActive':'false',
+'allowMraMode':'false',
+			
+			}
+		
+
+	# Execute the addPhone request
+	with client.settings(raw_response=True):
+		result = (service.getPhone( name = udevname ))
+
+	mytxt = (result.text)
+	phoneiter = 0
+	i = 0
+	#print(mytxt)
+	soup = bs(mytxt, 'html.parser')
+	#print(soup.find_all('pattern'))
+	print(soup.find_all('name'))
+	mydn = (soup.find_all('name'))
+	if (len(mydn) == 0 ):
+		resp = service.addPhone( phone )
+		mydevicej = udevname
+		print('not found')
+		print( '\naddPhone response:\n' )
+		print( resp,'\n' )
+	else:
+		print( 'Device Found' )
+
+def updatemulti(devlines,udevname):
+	try:
+		print(udevname)
+		print(devlines)
+		resp = service.updatePhone(name = udevname,
+		lines = devlines)
+	
+		print( '\nupdatePhone response:\n' )
+		print( resp,'\n' )
+
+	except Fault as err:
+		print( f'Zeep error: updatePhone: { err }' )
+		sys.exit( 1 )
+
+
+with open("PATH/cred.txt","r") as f:
+	mylist = f.read().splitlines() 
+	USERNAME=mylist[0]
+	PASSWORD=mylist[1]
+	ccmip=mylist[2]
+	f.close()
+
+#wsdl = "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL"
+#client = Client(wsdl)
+
+
+# Change to true to enable output of request/response headers and XML
+	DEBUG = False
+
+# The WSDL is a local file in the working directory, see README
+	WSDL_FILE = 'PATH/schema/AXLAPI.wsdl'
+
+# This class lets you view the incoming and outgoing http headers and XML
+
+
+
+# The first step is to create a SOAP client session
+	session = requests.Session()
+
+# We avoid certificate verification by default
+# And disable insecure request warnings to keep the output clear
+	session.verify = False
+	urllib3.disable_warnings( urllib3.exceptions.InsecureRequestWarning )
+
+
+
+# Add Basic Auth credentials
+	session.auth = HTTPBasicAuth( USERNAME,PASSWORD )
+
+#print (session.auth)
+
+# Create a Zeep transport and set a reasonable timeout value
+	transport = Transport( session = session, timeout = 10 )
+
+# strict=False is not always necessary, but it allows zeep to parse imperfect XML
+	settings = Settings( strict = False, xml_huge_tree = True )
+
+# If debug output is requested, add the MyLoggingPlugin callback
+#plugin = [ MyLoggingPlugin() ] if DEBUG else [ ]
+
+
+# Create the Zeep client with the specified settings
+	client = Client( WSDL_FILE, settings = settings, transport = transport )
+
+# Create the Zeep service binding to AXL at the specified CUCM
+
+
+	service = client.create_service( '{http://www.cisco.com/AXLAPIService/}AXLAPIBinding',f'https://{ccmip}:8443/axl/' )
+
+
+#Device Profile 
+def adduserdevprofile(enduserid,fullname, fname, lname, udpname, useremail):
+	userdp = {
+		'name':udpname,
+		'description':enduserid,
+		'product':'Cisco 7965',
+		'model':'Cisco 7965',
+		'class':'Device Profile',
+		'protocol':'SCCP',
+		'protocolSide':'User',
+		'phoneTemplateName':'your 7965 SCCP',
+		'softkeyTemplateName':'your User Softekey template',
+		'userHoldMohAudioSourceId':'1',
+	
+	'services':{
+		'service':[
+			{
+				'telecasterServiceName':'Corporate Directory',
+				'name':'Corporate Directory',
+				'url':'http://ccmcip/xmldirectoryinput.jsp',
+				'urlButtonIndex':'1',
+				'urlLabel':'Corporate Directory',
+				'serviceNameAscii':'Corporate Directory'
+				},
+			{
+				'telecasterServiceName':'Login Logout',
+				'name':'Login Logout',
+				'url':'http://ccmip/emapp/EMAppServlet?device=#DEVICENAME#&EMCC=#EMCC#',
+				'urlButtonIndex':'2',
+				'urlLabel':'Login Logout',
+				'serviceNameAscii':'Login Logout'
+				},
+			
+			
+			]
+		},
+	'dndStatus':'false',
+	}
+	try:
+		resp = service.addDeviceProfile(userdp)
+		print( '\nadd Device Profile response:\n' )
+		print( resp,'\n' )
+
+	except Fault as err:
+		print( f'Zeep error: add Device Profile: { err }' )
+		sys.exit( 1 )
+
+def updatemultidp(devlines,udpname):
+	try:
+		print(udpname)
+		print(devlines)
+		resp = service.updateDeviceProfile(name = udpname,
+		lines = devlines)
+	
+		print( '\nupdate Device Profile response:\n' )
+		print( resp,'\n' )
+
+	except Fault as err:
+		print( f'Zeep error: update Device Profile: { err }' )
+		sys.exit( 1 )
+
+
+
+#Iterating through the Bulk Data		
+for users in data:
+	devices = {
+		'device': []
+	}
+
+	devlines = {
+		'line' : []
+	}
+
+	myphoneProfiles = {
+					'profileName' :[]
+	}
+	
+	myusers = users.split(',')
+	blkdn = len(myusers)
+	enduserid = myusers[0]
+	print('This is the end user',enduserid)
+	userdn = myusers[6]
+	print(userdn)
+	extn = myusers[6]
+	udpname = myusers[2]
+	udevname = myusers[1]
+	devcss = myusers[7]
+	#print(udevname)
+	devices['device'].append(udevname)
+	myphoneProfiles['profileName'].append(udpname)
+	fname = myusers[3]
+	#print(fname)
+	lname = myusers[4]
+	#print(lname)
+	useremail = myusers[5]
+	#print(useremail)
+	plines = blkdn + 1
+	print(myusers)
+	
+	j = 1
+	k = 7
+	l = 8
+	createenduser(enduserid, fname, lname, udevname, useremail)
+	for i in range(6,blkdn,3):
+		lp = j
+		print(lp)
+		print(myusers[i])
+		userdn = myusers[i]
+		usercss = myusers[k]
+		fullname = myusers[l]
+
+		#for k in range(6,blkdn,2):
+
+		
+		adduserline(fullname, fname, lname, udevname, useremail, userdn, usercss)
+		userline =  {
+			'index' :  lp,
+				'label' :  fullname,
+				'display' :  fullname,
+				'dirn' :  {
+					'pattern' : userdn,
+					'routePartitionName' :'Your_Phones_PRT',
+					},
+				'ringSetting' : 'Ring',
+				'consecutiveRingSetting' : 'Use System Default',
+				
+				'displayAscii' :  fullname,
+				
+				'mwlPolicy' : 'Use System Policy',
+				'maxNumCalls':'6',
+				'busyTrigger':'2',
+				'callInfoDisplay' : {
+					'callerName' :'false',
+					'callerNumber' :'false',
+					'redirectedNumber' :'false',
+					'dialedNumber' :'false'
+					},
+				
+				'recordingFlag' : 'Call Recording Disabled',
+				'audibleMwi' : 'Default',
+				'associatedEndusers':{
+										'enduser':{
+													'userId':enduserid
+													}
+									},
+				'missedCallLogging' : 'true',
+				'recordingMediaSource' : 'Gateway Preferred'
+		
+					}
+			
+
+			
+		devlines['line'].append(userline)
+		j=j+1
+		k = k+3
+		l = l+3
+	adduserphone(enduserid, fullname, fname, lname, udevname, useremail, devcss)
+	adduserdevprofile(enduserid,fullname, fname, lname, udpname, useremail)
+	#print(devlines)
+	
+	updatemulti(devlines,udevname)
+	updatemultidp(devlines,udpname)
+		
+	updateenduser(enduserid,fname,lname,devices,myphoneProfiles,useremail,extn)
+	devlines.clear()
+	devices.clear()
+	
+	print('after clearing',devlines)
+
+
+
