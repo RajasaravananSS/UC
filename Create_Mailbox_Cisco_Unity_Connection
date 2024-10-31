@@ -1,0 +1,345 @@
+#This is creates a mailbox in Cisco unity Connection with Random PIN also checks if the extension or alias is in use and updates accordingly
+
+
+import requests
+from requests.auth import HTTPBasicAuth
+import logging
+from http.client import HTTPConnection
+import sys
+import urllib3
+from urllib3 import exceptions
+import os
+import lxml
+import re
+from lxml import etree as ET
+from bs4 import BeautifulSoup as bs
+import json
+import time
+import datetime
+import xmltodict
+
+
+
+def addvmsub():
+#def addvmsub(userdn,fname,lname,fullname,useremail):
+	dt = datetime.datetime.today()
+	ts = time.time()
+	ct = str(time.perf_counter())[-6:]
+	#usremail = useremail
+	mytime = str(ts)
+	#print(mytime)
+	ustime = mytime[6:10]
+	userdn = input('Please enter the extension:')
+	fullname = input('please enter the user ID:')
+	fname = input('please enter the First Name:')
+	lname = input('please enter the Second Name:')
+	useremail = input('please enter the Email ID:')
+	updateddn = "[<dtmfaccessid>" + userdn + "</dtmfaccessid>]"
+	ext = userdn
+	userextn = str(ext[0:4]) + str(dt.day) + str(dt.month) + str(dt.year)
+	prefix1 = userextn
+	mdprefix = str(prefix1)
+	oursess = requests.Session()
+
+	with open("PATH.txt","r") as f:
+		mylist = f.read().splitlines() 
+		USERNAMEC=mylist[0]
+		PASSWORDC=mylist[1]
+		cucip=mylist[2]
+		f.close()
+
+# Change to true to enable output of request/response headers and XML
+	DEBUG = False
+
+	if DEBUG:
+		print()
+		log = logging.getLogger( 'urllib3' )
+		log.setLevel( logging.DEBUG )
+
+	# logging from urllib3 to console
+		ch = logging.StreamHandler()
+		ch.setLevel(logging.DEBUG)
+		log.addHandler( ch )
+
+	# print statements from `http.client.HTTPConnection` to console/stdout
+		HTTPConnection.debuglevel = 1
+
+	urllib3.disable_warnings( exceptions.InsecureRequestWarning )
+
+	global i
+	global j
+	global k
+
+	i = 0
+	j = 0
+	def updatexistinguserdn(fullname):
+		myuserid = fullname
+		try:
+		
+			req = {
+			'DtmfAccessId':userdn,
+			}
+			chkurl = f'https://{cucip}/vmrest/users/{myuserid}'
+			resp = oursess.put( 
+			url = chkurl,
+			auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+			json = req,
+			verify = False)
+			print('user id update success')
+			#break
+		except Exception as err:
+			print( f'Request error: POST ../users: { err }' )
+			sys.exit( 1 )
+
+	#Create User Function:
+	def create_user():
+		#Try to find if the user exists we have already found that DN is not in use GETUSER
+		#If the user is there update userelse create the user
+		try:
+			#print(userurl)
+			myurl = f'https://{cucip}/vmrest/users/?query=(alias%20startswith%20{fullname})'
+			respgu = oursess.get( 
+			url = myurl,
+			auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+			verify = False
+			)
+			xdatagu = xmltodict.parse(respgu.text)
+			jdatagu = json.loads(json.dumps(xdatagu))
+			myobjid = jdatagu['Users']['User']['ObjectId']
+			updatexistinguserdn(myobjid)
+		
+
+		# Raise an exception if a non-200 HTTP response received
+			respgu.raise_for_status()
+	
+		except Exception as err:
+			print( f'Request error: POST ../users: { err }' )
+			req1 = {
+						'FirstName':fname,
+						'LastName':lname,
+						'Alias':fullname,
+						'Pin':ct,
+						'City':'New York',
+						'DisplayName':fullname,
+						'ListInDirectory':'true',
+						'IsVmEnrolled':'false',
+						'DtmfAccessId':userdn,
+						'PhoneNumber':userdn,
+						
+						
+						}
+			
+			adurl = f'https://{cucip}/vmrest/users?templateAlias=voicemailusertemplate'
+			resp = oursess.post( 
+			url = adurl,
+			auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+			json = req1,
+			verify = False
+			)
+
+		return(ct)
+			
+
+	
+
+	#Create a function to search for the User matching the given userdn
+	#Please note this function is used in multi-threading to check for existing match
+
+	def checktheuserdtmfid(abc):
+		try:
+			#print(userurl)
+			userurl = f'https://{cucip}/vmrest/users/?query=(dtmfaccessid%20is%20{abc})'
+			myurl = userurl
+			resp = oursess.get( 
+			url = myurl,
+			auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+			verify = False
+			)
+		
+
+		# Raise an exception if a non-200 HTTP response received
+			resp.raise_for_status()
+	
+		except Exception as err:
+			print( f'Request error: POST ../users: { err }' )
+			#failedabc.append(abc)
+			#sys.exit( 1 )
+		print('Check if the given DN and existing DN match in checkdtmf fun')
+		mytxt = resp.text # type: ignore
+		#print(mytxt)
+		soup = bs(mytxt, 'lxml')
+		
+		first_child = soup.find("body").find("users").find_all("user") # type: ignore
+		#print(first_child)
+		
+#Try to find existing user and update the DN with modified suffix
+		for mychil in first_child:
+			#print(mychil)
+			second_child = mychil.select('objectid')
+			up_second_child = str(second_child)
+			update_schild = up_second_child.replace('[<objectid>','').replace('</objectid>]','')
+			print(update_schild)
+			third_child = mychil.select('dtmfaccessid')
+			#fourth_child = third_child.replace('[<dtmfaccessid>','').replace('</dtmfaccessid>]','')
+			print(updateddn)
+			print(str(third_child))
+			if (str(third_child) == updateddn):
+				print('the existing DN match')
+				print(str(third_child))
+				#k = 0
+			
+			
+				#print(second_child)
+#updating the existing user
+				try:
+				
+					req = {
+					'DtmfAccessId':mdprefix,
+					}
+					chkurl = f'https://{cucip}/vmrest/users/{update_schild}'
+					resp = oursess.put( 
+					url = chkurl,
+					auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+					json = req,
+					verify = False)
+					print('user id update success')
+					#break
+				except Exception as err:
+					print( f'Request error: POST ../users: { err }' )
+					sys.exit( 1 )
+
+				#print(resp.headers)
+				# Raise an exception if a non-200 HTTP response received
+					resp.raise_for_status()
+	
+			
+			else:
+				k = 1
+				#continue
+		#return(failedabc) There is no need to return anything since there will be a perfecrt match
+
+		#End Of the Function To update the exiting match for the extension part 1 below is part 2
+		#to check using the URL for each alphabet
+	
+	
+
+	#Try find if the new user already exist, if not create one making sure the new DN is not in use
+	#using the above function check DTMF
+	#If the User is there make sure the user current DN matches the new DN
+	#If there is a DN mismatch update user with new DN, also make sure the new DN is not in use
+	#using the check DTMF function above
+
+
+	def gettheuser(userdn):
+	
+		#k = 1
+		try:
+			#print(userurl)
+			myurl = f'https://{cucip}/vmrest/users/?query=(dtmfaccessid%20is%20{userdn})'
+			resp = oursess.get( 
+			url = myurl,
+			auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+			verify = False
+			)
+			print(resp.status_code)
+		
+
+		# Raise an exception if a non-200 HTTP response received
+			resp.raise_for_status()
+	
+		except Exception as err:
+			print( f'Request error: POST ../users: { err }' )
+			#sys.exit( 1 )
+		#print('Check if the DN exists before creating new user')
+        #Check if the DN exists before creating new user
+		mytxt = resp.text # type: ignore
+		print(mytxt)
+		soup = bs(mytxt, 'lxml')
+		first_child = soup.select("Users")
+		print(first_child)
+		#the new user doesnot exist in the system if the below condition matches
+		if(str(first_child) == '[<users total="0"></users>]'):
+			print('String Matches')
+			create_user()
+			
+					
+		else:
+			#Call the function to check if the current extension matches with the new extension
+			#The user existed and we are checking his current DN
+			#DN and DTMF access ID are one and the same
+			print('The DN is in the system already')
+			try:
+			#print(userurl)
+				myurl = f'https://{cucip}/vmrest/users/?query=(dtmfaccessid%20is%20{userdn})'
+				resp = oursess.get(url = myurl,
+				auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+				verify = False
+				)
+				
+				xdata = xmltodict.parse(resp.text)
+				jdata = json.loads(json.dumps(xdata))
+				myid = jdata['Users']['User']['Alias']
+				myidlc = myid.lower()
+				guserlc = fullname.lower()
+				if (myidlc == guserlc):
+					print("New User Data Matches")
+				else:
+					print("New User Data Doesn't Match")
+		
+
+		# Raise an exception if a non-200 HTTP response received
+				resp.raise_for_status()
+	
+			except Exception as err:
+				print( f'Request error: POST ../users: { err }' )
+			
+			checktheuserdtmfid(userdn)
+			create_user()
+	def updateuserpin(fullname,ct):
+		try:
+			resp = requests.get( 
+				f'https://{cucip}/vmrest/users?query=(alias%20startswith%20{fullname})',
+				auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+				verify = False
+				)
+
+			# Raise an exception if a non-200 HTTP response received
+			resp.raise_for_status()
+			
+		except Exception as err:
+			print( f'Request error: POST ../users: { err }' )
+			sys.exit( 1 )
+
+
+
+		mytxt = resp.text
+
+		soup = bs(mytxt, 'lxml')
+		first_child = soup.find("body").find("users").find_all("user")
+		#print(first_child)
+		for mychil in first_child:
+			second_child = mychil.select('objectid')
+			up_second_child = str(second_child)
+			update_schild = up_second_child.replace('[<objectid>','').replace('</objectid>]','')
+			print(update_schild)
+			third_child = mychil.select('alias')
+			print(str(third_child))
+			try:
+				req = {
+					'Credentials':ct,
+					}
+				url = f'https://{cucip}/vmrest/users/{update_schild}/credential/pin'
+				resp = requests.put( 
+				url = url,
+				auth=HTTPBasicAuth( USERNAMEC,PASSWORDC ),
+				json = req,
+				verify = False)
+				print(resp)
+				print("This is the user PIN: ",ct)
+			
+			except Exception as err:
+				print( f'Request error: POST ../users: { err }' )
+				sys.exit( 1 )
+	gettheuser(userdn)
+	updateuserpin(fullname,ct)
+addvmsub()
